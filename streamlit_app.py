@@ -1,367 +1,370 @@
 import streamlit as st
 import requests
 import json
+import uuid
 from datetime import datetime
 
-# ----------------------------
-# Config
-# ----------------------------
-st.set_page_config(
-    page_title="Hustad AI Assistant",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+# ---------------------------
+# Page + Theme
+# ---------------------------
+st.set_page_config(page_title="Hustad AI Assistant", page_icon="🧠", layout="wide")
 
-N8N_WEBHOOK_URL = st.secrets.get("N8N_WEBHOOK_URL", "")
+CUSTOM_CSS = """
+<style>
+/* Global */
+.block-container { padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1400px; }
+[data-testid="stSidebar"] { background: rgba(20, 22, 28, 0.65); backdrop-filter: blur(8px); }
+h1, h2, h3 { letter-spacing: -0.02em; }
 
-# ----------------------------
-# Minimal “SaaS” styling
-# ----------------------------
-st.markdown(
-    """
-    <style>
-      .block-container { padding-top: 1.25rem; padding-bottom: 2rem; }
-      [data-testid="stSidebar"] { border-right: 1px solid rgba(255,255,255,0.08); }
-      .topbar {
-        display:flex; align-items:center; justify-content:space-between;
-        padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 14px; background: rgba(255,255,255,0.03);
-      }
-      .brand { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.2px; }
-      .subtle { color: rgba(255,255,255,0.65); font-size: 0.9rem; }
-      .card {
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 14px;
-        padding: 1rem;
-        background: rgba(255,255,255,0.03);
-      }
-      .chip {
-        display:inline-flex; align-items:center; gap:.45rem;
-        padding: .25rem .55rem; border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.10);
-        background: rgba(255,255,255,0.02);
-        font-size: .82rem;
-        color: rgba(255,255,255,0.72);
-      }
-      .muted { color: rgba(255,255,255,0.62); }
-      .tiny { font-size: 0.82rem; color: rgba(255,255,255,0.60); }
-      .divider { height:1px; background: rgba(255,255,255,0.08); margin: .75rem 0; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+/* Header */
+.hustad-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(35,40,55,0.85), rgba(25,27,34,0.85));
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.hustad-badge {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  font-size: 12px;
+  color: rgba(255,255,255,0.82);
+}
 
-# ----------------------------
-# Session state
-# ----------------------------
+/* Cards */
+.card {
+  border-radius: 16px;
+  padding: 16px 16px;
+  background: rgba(22,24,30,0.85);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.card-title {
+  font-size: 14px;
+  color: rgba(255,255,255,0.75);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+hr.soft {
+  border: none;
+  height: 1px;
+  background: rgba(255,255,255,0.07);
+  margin: 12px 0;
+}
+
+/* Chat bubbles */
+.chat-wrap {
+  border-radius: 16px;
+  background: rgba(18,20,26,0.75);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 12px;
+}
+.small-muted { color: rgba(255,255,255,0.6); font-size: 12px; }
+.kv {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 8px 14px;
+  margin-top: 6px;
+}
+.k { color: rgba(255,255,255,0.70); font-size: 13px; }
+.v { color: rgba(255,255,255,0.92); font-size: 13px; }
+.pill {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  font-size: 12px;
+  color: rgba(255,255,255,0.82);
+}
+</style>
+"""
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# ---------------------------
+# Config / Secrets
+# ---------------------------
+# In Streamlit Cloud:
+# Settings → Secrets:
+# N8N_WEBHOOK_URL = "https://.../webhook/...."  (PRODUCTION url)
+N8N_WEBHOOK_URL = st.secrets.get("N8N_WEBHOOK_URL", "").strip()
+
+# ---------------------------
+# Session State
+# ---------------------------
 if "session_id" not in st.session_state:
-    st.session_state.session_id = f"sess-{int(datetime.utcnow().timestamp())}"
-
-if "user_id" not in st.session_state:
-    # You can later make this dynamic (SSO/login). For now:
-    st.session_state.user_id = "aminul@hustadcompanies.com"
-
+    st.session_state.session_id = str(uuid.uuid4())
 if "messages" not in st.session_state:
-    st.session_state.messages = []  # [{"role":"user"/"assistant","content":...,"raw":...}]
+    st.session_state.messages = []
+if "last_debug" not in st.session_state:
+    st.session_state.last_debug = None
+if "prefill" not in st.session_state:
+    st.session_state.prefill = ""
 
-if "page" not in st.session_state:
-    st.session_state.page = "Chat"
-
-# ----------------------------
+# ---------------------------
 # Helpers
-# ----------------------------
-def call_n8n(message: str) -> dict:
+# ---------------------------
+def safe_json(obj):
+    try:
+        return json.dumps(obj, indent=2)
+    except Exception:
+        return str(obj)
+
+def post_to_n8n(message: str, session_id: str, user_id: str):
     if not N8N_WEBHOOK_URL:
-        return {"message": "Missing N8N_WEBHOOK_URL in Streamlit secrets.", "data": {}, "raw": {}}
+        raise RuntimeError("Missing N8N_WEBHOOK_URL in Streamlit secrets.")
 
     payload = {
         "message": message,
-        "sessionId": st.session_state.session_id,
-        "userId": st.session_state.user_id,
+        "sessionId": session_id,
+        "userId": user_id,
     }
-
     r = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=120)
+    # Keep debug
+    debug = {
+        "status_code": r.status_code,
+        "request_url": N8N_WEBHOOK_URL,
+        "payload": payload,
+        "raw_text": r.text[:5000],
+    }
+    st.session_state.last_debug = debug
+
     r.raise_for_status()
-
-    # n8n might return different shapes; normalize here:
     try:
-        resp = r.json()
+        return r.json()
     except Exception:
-        return {"message": r.text, "data": {}, "raw": {"rawText": r.text}}
+        return {"raw": r.text}
 
-    # Expected-ish: { reply: <obj/string>, sessionId, userId } OR { message, data } etc.
-    raw = resp
-
-    # Normalize message/data
-    message_out = None
-    data_out = {}
-
-    if isinstance(resp, dict):
-        if "message" in resp and isinstance(resp["message"], str):
-            message_out = resp["message"]
-            data_out = resp.get("data", {}) or {}
-        elif "reply" in resp:
-            reply = resp["reply"]
-            if isinstance(reply, dict):
-                # Sometimes reply itself includes "message"
-                message_out = reply.get("message") or reply.get("output") or None
-                data_out = reply
-            else:
-                message_out = str(reply)
-        elif "output" in resp:
-            message_out = str(resp["output"])
-        else:
-            message_out = json.dumps(resp, indent=2)
-    else:
-        message_out = str(resp)
-
-    return {"message": message_out or "", "data": data_out or {}, "raw": raw}
-
-
-def render_property_card(data: dict):
+def normalize_reply(data: dict):
     """
-    Tries to render a nice property card from structured fields.
-    Works even if fields differ slightly.
+    Expecting your n8n response:
+      { reply: <obj/string>, sessionId: "...", userId: "..." }
+    But handle variations safely.
     """
-    # Common keys you’ve shown:
-    # data might contain: chosen -> attributes -> ... OR direct keys.
-    attrs = {}
-    link = None
+    reply = data.get("reply", data)
+    # If n8n returns { "output": "..."} style
+    if isinstance(reply, dict) and "output" in reply and len(reply.keys()) == 1:
+        reply = reply["output"]
 
-    # If your n8n final "reply" includes this:
-    # { "chosen": { "attributes": {...}, "options": {"text":"..."} }, ... }
-    if isinstance(data, dict) and "chosen" in data and isinstance(data["chosen"], dict):
-        attrs = data["chosen"].get("attributes", {}) or {}
-        opt = data["chosen"].get("options", {}) or {}
-        link = opt.get("text")
+    # If reply is JSON in string form
+    if isinstance(reply, str):
+        try:
+            return json.loads(reply)
+        except Exception:
+            return {"message": reply}
 
-    # Fallback if you send a flattened payload later
-    if not attrs and isinstance(data, dict):
-        attrs = data.get("attributes", {}) or {}
+    return reply if isinstance(reply, dict) else {"message": str(reply)}
 
-    name = attrs.get("name") or data.get("Property name") or data.get("property_name")
-    roof = attrs.get("roofType") or data.get("Roof Type") or data.get("roofType")
-    buildings = attrs.get("numberOfBuildings") or data.get("Number of Buildings") or data.get("numberOfBuildings")
-    squares = attrs.get("squares") or data.get("Squares") or data.get("squares")
-    close_rate = attrs.get("closeRate") or data.get("Close Rate") or data.get("closeRate")
-    activity = attrs.get("activity") or data.get("Activity") or data.get("activity")
-    street = attrs.get("streetAddress") or data.get("Address") or data.get("streetAddress")
-    city = attrs.get("city")
-    state = attrs.get("state")
-    postal = attrs.get("postalCode")
-
-    address = None
-    if street:
-        addr_parts = [street]
-        tail = ", ".join([p for p in [city, state, postal] if p])
-        if tail:
-            addr_parts.append(tail)
-        address = " • ".join(addr_parts)
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-
-    # Header
+def render_capabilities():
     st.markdown(
-        f"""
-        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem;">
-          <div>
-            <div style="font-size:1.15rem; font-weight:700;">{name or "Property"}</div>
-            <div class="subtle">{address or "—"}</div>
-          </div>
-          <div class="chip">🏢 Property</div>
+        """
+        <div class="card">
+          <div class="card-title">This assistant can do</div>
+          <ul style="margin:0; padding-left: 1.2rem; color: rgba(255,255,255,0.9); line-height: 1.5;">
+            <li>Find company information (name / address / ID)</li>
+            <li>Find property information (name / address / ID)</li>
+            <li>Find ticket information (property, description, price, link) by ticket ID</li>
+            <li>Find invoice for a ticket by ticket ID</li>
+            <li>Show 5 most recent service / opportunity tickets (by property)</li>
+            <li>Show all notes for a property</li>
+            <li>Write executive summary report + draft client response (by property)</li>
+            <li>Create service ticket in CenterPoint Connect (property + issue)</li>
+            <li>Chat history per session (can reset)</li>
+            <li>Check weather at a property / company</li>
+          </ul>
         </div>
         """,
-        unsafe_allow_html=True,
+        unsafe_allow_html=True
     )
 
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+def render_quick_actions():
+    st.markdown('<div class="card"><div class="card-title">Quick actions</div>', unsafe_allow_html=True)
 
-    # Metrics
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Buildings", buildings if buildings is not None else "—")
-    c2.metric("Squares", squares if squares is not None else "—")
-    c3.metric("Close Rate", f"{close_rate}%" if close_rate is not None else "—")
-    c4.metric("Roof", roof if roof else "—")
+    colA, colB, colC = st.columns(3)
+    with colA:
+        if st.button("🏢 Find a property", use_container_width=True):
+            st.session_state.prefill = "show property "
+    with colB:
+        if st.button("🎫 Check tickets", use_container_width=True):
+            st.session_state.prefill = "show tickets for property "
+    with colC:
+        if st.button("🛠️ Create service ticket", use_container_width=True):
+            st.session_state.prefill = "create service ticket for property  issue: "
 
-    # Extra
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-    st.markdown(
-        f"""
-        <div class="tiny">
-          <b>Activity:</b> {activity or "—"}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
 
-    if link:
-        st.markdown(f"🔗 For more info: {link}")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("🧾 Find invoice (ticket id)", use_container_width=True):
+            st.session_state.prefill = "show invoice for ticket "
+    with c2:
+        if st.button("📝 Exec summary (property)", use_container_width=True):
+            st.session_state.prefill = "write executive summary for property "
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+def render_reply(reply_obj: dict):
+    """
+    Make output look clean instead of dumping JSON.
+    Try to detect common shapes and present nicely.
+    """
+    # Common: {message: "..."} only
+    if set(reply_obj.keys()) <= {"message"}:
+        st.markdown(reply_obj.get("message", ""))
 
-def looks_like_property(data: dict) -> bool:
-    if not isinstance(data, dict):
-        return False
-    # Heuristics based on what you showed
-    if "chosen" in data and isinstance(data["chosen"], dict):
-        attrs = data["chosen"].get("attributes", {}) or {}
-        return "name" in attrs or "streetAddress" in attrs
-    # fallback heuristics
-    return any(k in data for k in ["Property name", "roofType", "numberOfBuildings", "attributes"])
+    # Property / Company / Ticket style fields
+    # If your n8n returns a structured block like:
+    # { title, fields:{...}, link, ... } we support that too.
+    title = reply_obj.get("title") or reply_obj.get("heading") or reply_obj.get("name")
+    message = reply_obj.get("message") or reply_obj.get("summary")
 
+    if title:
+        st.markdown(f"### {title}")
+    if message:
+        st.markdown(message)
 
-# ----------------------------
-# Sidebar (SaaS Navigation)
-# ----------------------------
+    # Render "fields" as key/value
+    fields = reply_obj.get("fields")
+    if isinstance(fields, dict) and fields:
+        st.markdown('<div class="kv">', unsafe_allow_html=True)
+        for k, v in fields.items():
+            st.markdown(f'<div class="k">{k}</div><div class="v">{v}</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # Fallback: show key/values (excluding giant blobs)
+    # If reply is a raw object from CPC, show a small summary and keep raw in debug expander.
+    if not fields and len(reply_obj.keys()) > 1:
+        # Try to show a friendly compact view
+        compact = {}
+        for k, v in reply_obj.items():
+            if k in ("raw", "data", "response", "output"):
+                continue
+            # Avoid huge nested objects here
+            if isinstance(v, (dict, list)) and len(str(v)) > 300:
+                continue
+            compact[k] = v
+
+        if compact and compact != reply_obj:
+            st.markdown('<div class="kv">', unsafe_allow_html=True)
+            for k, v in compact.items():
+                st.markdown(f'<div class="k">{k}</div><div class="v">{v}</div>', unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    # Optional: link
+    link = reply_obj.get("link") or reply_obj.get("url")
+    if link:
+        st.markdown(f"**Link:** {link}")
+
+# ---------------------------
+# Sidebar (SaaS style)
+# ---------------------------
 with st.sidebar:
-    st.markdown("### Hustad AI")
-    st.caption("Internal assistant dashboard")
+    st.markdown("## Hustad AI")
+    st.markdown('<span class="pill">Internal Tool</span>', unsafe_allow_html=True)
+    st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
 
-    st.session_state.page = st.radio(
-        "Navigate",
-        ["Chat", "Recent Activity", "Settings"],
-        index=["Chat", "Recent Activity", "Settings"].index(st.session_state.page),
-    )
+    user_id = st.text_input("User ID", value="aminul@hustadcompanies.com")
+    st.markdown(f'<div class="small-muted">Session</div><div class="pill">{st.session_state.session_id}</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    st.markdown("**Session**")
-    st.code(st.session_state.session_id, language="text")
-    st.markdown("**User**")
-    st.code(st.session_state.user_id, language="text")
-
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    if st.button("🧹 Clear chat"):
+    st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
+    if st.button("🧹 New chat session", use_container_width=True):
+        st.session_state.session_id = str(uuid.uuid4())
         st.session_state.messages = []
+        st.session_state.last_debug = None
+        st.session_state.prefill = ""
         st.rerun()
 
-# ----------------------------
-# Top bar
-# ----------------------------
+    st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
+    st.markdown("### Status")
+    if N8N_WEBHOOK_URL:
+        st.success("Connected to n8n webhook")
+    else:
+        st.warning("Missing N8N_WEBHOOK_URL (set in Streamlit Secrets)")
+
+# ---------------------------
+# Main Layout
+# ---------------------------
 st.markdown(
     f"""
-    <div class="topbar">
+    <div class="hustad-header">
       <div>
-        <div class="brand">Hustad AI Assistant</div>
-        <div class="subtle">Chat + tools + property/ticket workflows</div>
+        <div style="font-size: 24px; font-weight: 700;">Hustad AI Assistant</div>
+        <div style="color: rgba(255,255,255,0.65); font-size: 13px;">
+          Ask about properties, companies, tickets, invoices, summaries, and service ticket creation.
+        </div>
       </div>
-      <div class="chip">🟢 Online</div>
+      <div class="hustad-badge">🕒 {datetime.now().strftime("%b %d, %Y • %I:%M %p")}</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
+
 st.write("")
 
-# ----------------------------
-# Pages
-# ----------------------------
-if st.session_state.page == "Chat":
-    # Two-column SaaS layout: Chat + Right panel
-    left, right = st.columns([2.2, 1], gap="large")
+left, right = st.columns([0.35, 0.65], gap="large")
 
-    with left:
-        # Chat history
-        for msg in st.session_state.messages:
-            with st.chat_message(msg["role"]):
-                st.write(msg["content"])
+with left:
+    render_capabilities()
+    st.write("")
+    render_quick_actions()
 
-                # Optional debug per message
-                if msg.get("raw") is not None and msg["role"] == "assistant":
-                    with st.expander("Debug / Raw response", expanded=False):
-                        st.json(msg["raw"])
+with right:
+    st.markdown('<div class="card"><div class="card-title">Chat</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chat-wrap">', unsafe_allow_html=True)
 
-        prompt = st.chat_input("Type your message…")
-        if prompt:
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.write(prompt)
+    # Render history
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            if isinstance(msg.get("content"), dict):
+                render_reply(msg["content"])
+            else:
+                st.markdown(msg.get("content", ""))
 
-            with st.chat_message("assistant"):
-                with st.spinner("Working…"):
-                    try:
-                        resp = call_n8n(prompt)
-                    except requests.exceptions.HTTPError as e:
-                        st.error("Request failed.")
-                        st.code(str(e))
-                        resp = {"message": "HTTP error calling backend.", "data": {}, "raw": {"error": str(e)}}
-                    except Exception as e:
-                        st.error("Unexpected error.")
-                        st.code(str(e))
-                        resp = {"message": "Unexpected error calling backend.", "data": {}, "raw": {"error": str(e)}}
+    # Input with prefill
+    prompt = st.chat_input("Type your message…", key="chat_input")
+    if not prompt and st.session_state.prefill:
+        # Show prefill hint as a helper line (not auto-sending)
+        st.markdown(f'<div class="small-muted">Tip: click in the input and paste → <span class="pill">{st.session_state.prefill}</span></div>', unsafe_allow_html=True)
 
-                # Render nicely if property-like
-                if looks_like_property(resp.get("data", {})):
-                    # short chat line + card
-                    st.write("Here’s what I found:")
-                    render_property_card(resp.get("data", {}))
-                    assistant_text = "Here’s what I found (see details above)."
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Debug expander
+    with st.expander("Debug / Raw response"):
+        st.write("Last request/response:")
+        st.code(safe_json(st.session_state.last_debug), language="json")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ---------------------------
+# Handle Send
+# ---------------------------
+if prompt:
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Working…"):
+            try:
+                resp = post_to_n8n(prompt, st.session_state.session_id, user_id)
+                reply_obj = normalize_reply(resp)
+
+                # If response is still huge raw, keep it in debug and show a friendly message
+                # Otherwise render nicely
+                if isinstance(reply_obj, dict) and ("output" in reply_obj or "raw" in reply_obj) and len(str(reply_obj)) > 2000:
+                    st.markdown("✅ Got the result. It’s a large payload — see **Debug / Raw response** for full details.")
                 else:
-                    st.write(resp.get("message", "") or "—")
-                    assistant_text = resp.get("message", "") or "—"
+                    render_reply(reply_obj)
 
-                # Save message + raw for debug
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": assistant_text, "raw": resp.get("raw")}
-                )
+                st.session_state.messages.append({"role": "assistant", "content": reply_obj})
 
-                # Optional global debug for latest
-                with st.expander("Debug / Raw response (latest)", expanded=False):
-                    st.json(resp.get("raw"))
-
-            st.rerun()
-
-    with right:
-        # Right panel: quick stats + helpful shortcuts
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("#### Overview")
-        st.caption("Quick glance at your assistant usage")
-        st.metric("Messages", len(st.session_state.messages))
-        st.metric("Session", st.session_state.session_id)
-        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-        st.markdown("#### Quick actions")
-        if st.button("🏢 Find a property"):
-            st.session_state.messages.append({"role": "user", "content": "show company Riverport Landings Senior"})
-            st.rerun()
-        if st.button("🎟️ Check tickets"):
-            st.session_state.messages.append({"role": "user", "content": "show tickets"})
-            st.rerun()
-        if st.button("📝 Create service ticket"):
-            st.session_state.messages.append({"role": "user", "content": "create service ticket for Riverport Landings Senior"})
-            st.rerun()
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-elif st.session_state.page == "Recent Activity":
-    st.markdown("## Recent Activity")
-    st.caption("A simple timeline of user requests + assistant responses.")
-
-    if not st.session_state.messages:
-        st.info("No activity yet.")
-    else:
-        # show last 30 messages
-        for i, m in enumerate(st.session_state.messages[-30:], start=1):
-            st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.markdown(f"**{m['role'].upper()}**")
-            st.write(m["content"])
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.write("")
-
-elif st.session_state.page == "Settings":
-    st.markdown("## Settings")
-    st.caption("Control app behavior")
-
-    st.markdown("### Backend")
-    st.write("Webhook configured:", "✅" if bool(N8N_WEBHOOK_URL) else "❌")
-    if not N8N_WEBHOOK_URL:
-        st.warning("Add `N8N_WEBHOOK_URL` to Streamlit Secrets.")
-
-    st.markdown("### User")
-    new_user = st.text_input("User ID", st.session_state.user_id)
-    if new_user and new_user != st.session_state.user_id:
-        st.session_state.user_id = new_user
-        st.success("User updated.")
-        st.rerun()
+            except Exception as e:
+                st.error(f"Request failed: {e}")
+                st.session_state.messages.append({"role": "assistant", "content": {"message": f"Request failed: {e}"}})
