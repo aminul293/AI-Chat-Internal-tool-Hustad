@@ -11,83 +11,153 @@ st.set_page_config(page_title="Hustad AI Assistant", page_icon="🧠", layout="w
 
 CUSTOM_CSS = """
 <style>
-/* Global */
-.block-container { padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1400px; }
-[data-testid="stSidebar"] { background: rgba(20, 22, 28, 0.65); backdrop-filter: blur(8px); }
-h1, h2, h3 { letter-spacing: -0.02em; }
-
-/* Header */
-.hustad-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 18px;
-  border-radius: 14px;
-  background: linear-gradient(90deg, rgba(35,40,55,0.85), rgba(25,27,34,0.85));
-  border: 1px solid rgba(255,255,255,0.08);
+:root{
+  --bg:#0b1220;
+  --panel: rgba(17, 24, 39, 0.72);
+  --panel2: rgba(17, 24, 39, 0.50);
+  --border: rgba(255,255,255,0.10);
+  --text: rgba(255,255,255,0.92);
+  --muted: rgba(255,255,255,0.65);
+  --accent: #60a5fa;   /* blue */
+  --accent2:#a78bfa;   /* purple */
+  --good:#22c55e;
+  --warn:#f59e0b;
 }
-.hustad-badge {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
+
+html, body, [data-testid="stAppViewContainer"]{
+  background:
+    radial-gradient(1200px 800px at 18% 0%, rgba(96,165,250,0.22), transparent 55%),
+    radial-gradient(900px 700px at 88% 0%, rgba(167,139,250,0.20), transparent 55%),
+    radial-gradient(1000px 700px at 50% 100%, rgba(34,197,94,0.10), transparent 60%),
+    var(--bg);
+  color: var(--text);
+}
+
+.block-container{
+  padding-top: 0.9rem !important;
+  padding-bottom: 1.2rem !important;
+  max-width: 1700px !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"]{
+  background: linear-gradient(180deg, rgba(15,23,42,0.92), rgba(2,6,23,0.92));
+  border-right: 1px solid var(--border);
+}
+[data-testid="stSidebar"] .block-container{ padding-top: 1.1rem; }
+
+.sidebar-title{
+  display:flex; gap:10px; align-items:center;
+  font-weight: 800; font-size: 14px;
+  color: var(--text);
+}
+.logo-dot{
+  width:28px; height:28px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 10px 28px rgba(96,165,250,0.22);
+}
+.small-muted{ color: var(--muted); font-size: 12px; }
+.divider{ height:1px; background: rgba(255,255,255,0.08); margin: 12px 0; border: none; }
+
+/* Topbar */
+.topbar{
+  display:flex; justify-content:space-between; align-items:center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+  border: 1px solid rgba(255,255,255,0.10);
+}
+.topbar h2{ margin: 0; font-size: 16px; font-weight: 800; }
+.status-pill{
+  display:inline-flex; gap:8px; align-items:center;
+  padding: 6px 10px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
-  font-size: 12px;
-  color: rgba(255,255,255,0.82);
+  font-size: 12px; color: var(--muted);
+}
+.dot{
+  width:8px; height:8px; border-radius:999px; background: var(--good);
+  box-shadow: 0 0 0 4px rgba(34,197,94,0.12);
 }
 
 /* Cards */
-.card {
+.card{
   border-radius: 16px;
-  padding: 16px 16px;
-  background: rgba(22,24,30,0.85);
-  border: 1px solid rgba(255,255,255,0.08);
+  padding: 14px 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
 }
-.card-title {
-  font-size: 14px;
+.card-title{
   color: rgba(255,255,255,0.75);
+  font-size: 12px;
+  letter-spacing: .12em;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
   margin-bottom: 10px;
 }
-hr.soft {
-  border: none;
-  height: 1px;
-  background: rgba(255,255,255,0.07);
-  margin: 12px 0;
+.pill{
+  display:inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  font-size: 12px;
+  color: rgba(255,255,255,0.78);
+}
+
+/* Buttons */
+.stButton>button{
+  border-radius: 12px !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  background: rgba(255,255,255,0.06) !important;
+  color: var(--text) !important;
+  padding: 0.7rem 0.9rem !important;
+  transition: all 0.15s ease !important;
+}
+.stButton>button:hover{
+  transform: translateY(-1px);
+  border-color: rgba(96,165,250,0.45) !important;
+  box-shadow: 0 12px 26px rgba(96,165,250,0.18);
+}
+
+/* Chat shell */
+.chat-shell{
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(2, 6, 23, 0.35);
+  padding: 12px 14px;
+  min-height: 70vh;
 }
 
 /* Chat bubbles */
-.chat-wrap {
+.bubble{
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+}
+.bubble.user{
+  background: linear-gradient(135deg, rgba(96,165,250,0.18), rgba(167,139,250,0.12));
+  border-color: rgba(96,165,250,0.25);
+}
+.bubble.assistant{
+  background: rgba(255,255,255,0.06);
+}
+.kv{
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 8px 14px;
+  margin-top: 10px;
+}
+.k{ color: rgba(255,255,255,0.70); font-size: 13px; }
+.v{ color: rgba(255,255,255,0.92); font-size: 13px; }
+
+/* Composer */
+.composer{
   border-radius: 16px;
-  background: rgba(18,20,26,0.75);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
   padding: 12px;
 }
-.small-muted { color: rgba(255,255,255,0.6); font-size: 12px; }
-.kv {
-  display: grid;
-  grid-template-columns: 170px 1fr;
-  gap: 8px 14px;
-  margin-top: 6px;
-}
-.k { color: rgba(255,255,255,0.70); font-size: 13px; }
-.v { color: rgba(255,255,255,0.92); font-size: 13px; }
-.pill {
-  display: inline-block;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
-  font-size: 12px;
-  color: rgba(255,255,255,0.82);
-}
-
-/* Buttons - subtle lift */
-button[kind="secondary"] { border-radius: 14px !important; }
-button[kind="primary"] { border-radius: 14px !important; }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -95,25 +165,37 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 # ---------------------------
 # Config / Secrets
 # ---------------------------
-# In Streamlit Cloud:
-# Settings → Secrets:
-# N8N_WEBHOOK_URL = "https://.../webhook/...."  (PRODUCTION url)
 N8N_WEBHOOK_URL = st.secrets.get("N8N_WEBHOOK_URL", "").strip()
 
 # ---------------------------
-# Session State
+# Session State (SaaS-style sessions)
 # ---------------------------
-if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "last_debug" not in st.session_state:
-    st.session_state.last_debug = None
-if "prefill" not in st.session_state:
-    st.session_state.prefill = ""
-if "chat_input" not in st.session_state:
-    st.session_state.chat_input = ""
+def _new_session():
+    return {
+        "id": str(uuid.uuid4()),
+        "title": "New session",
+        "messages": [],
+        "last_debug": None,
+        "created": datetime.now().isoformat(),
+    }
 
+if "sessions" not in st.session_state:
+    st.session_state.sessions = [_new_session()]
+if "active_session_id" not in st.session_state:
+    st.session_state.active_session_id = st.session_state.sessions[0]["id"]
+if "draft" not in st.session_state:
+    st.session_state.draft = ""
+
+def get_active_session():
+    for s in st.session_state.sessions:
+        if s["id"] == st.session_state.active_session_id:
+            return s
+    # fallback
+    st.session_state.sessions.insert(0, _new_session())
+    st.session_state.active_session_id = st.session_state.sessions[0]["id"]
+    return st.session_state.sessions[0]
+
+active = get_active_session()
 
 # ---------------------------
 # Helpers
@@ -124,68 +206,33 @@ def safe_json(obj):
     except Exception:
         return str(obj)
 
-
-def set_prefill(text: str):
-    """Set prefill and actually inject into the chat input."""
-    st.session_state.prefill = text
-    st.session_state.chat_input = text
-
-
 def post_to_n8n(message: str, session_id: str, user_id: str):
     if not N8N_WEBHOOK_URL:
         raise RuntimeError("Missing N8N_WEBHOOK_URL in Streamlit secrets.")
 
     payload = {"message": message, "sessionId": session_id, "userId": user_id}
+    r = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=120)
 
-    try:
-        r = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=60)
-    except requests.exceptions.RequestException as e:
-        st.session_state.last_debug = {
-            "status_code": None,
-            "request_url": N8N_WEBHOOK_URL,
-            "payload": payload,
-            "raw_text": str(e),
-        }
-        raise RuntimeError(f"n8n request error: {e}")
-
-    st.session_state.last_debug = {
+    debug = {
         "status_code": r.status_code,
         "request_url": N8N_WEBHOOK_URL,
         "payload": payload,
-        "raw_text": r.text[:5000],
+        "raw_text": r.text[:8000],
     }
-
-    if r.status_code >= 500:
-        raise RuntimeError(f"n8n server error: {r.status_code}")
-    if r.status_code == 404:
-        raise RuntimeError("n8n webhook not found (404). Check PROD webhook URL.")
-    if r.status_code in (401, 403):
-        raise RuntimeError("n8n unauthorized. Check auth/protection settings.")
+    active["last_debug"] = debug
 
     r.raise_for_status()
-
     try:
         return r.json()
     except Exception:
-        return {"reply": r.text}
-
+        return {"raw": r.text}
 
 def normalize_reply(data: dict):
-    """
-    Expecting your n8n response:
-      { reply: <obj/string>, sessionId: "...", userId: "..." }
-    But handle variations safely.
-    """
-    if not isinstance(data, dict):
-        return {"message": str(data)}
-
     reply = data.get("reply", data)
-
-    # If n8n returns { "output": "..."} style
     if isinstance(reply, dict) and "output" in reply and len(reply.keys()) == 1:
         reply = reply["output"]
 
-    # If reply is JSON in string form
+    # string -> maybe json
     if isinstance(reply, str):
         try:
             return json.loads(reply)
@@ -194,118 +241,96 @@ def normalize_reply(data: dict):
 
     return reply if isinstance(reply, dict) else {"message": str(reply)}
 
+def infer_session_title_from_prompt(prompt: str) -> str:
+    p = (prompt or "").strip()
+    if not p:
+        return "New session"
+    # short title
+    p = p.replace("\n", " ")
+    return (p[:40] + "…") if len(p) > 40 else p
 
-def render_capabilities():
+def render_capabilities_card():
     st.markdown(
         """
         <div class="card">
-          <div class="card-title">This assistant can do</div>
-          <ul style="margin:0; padding-left: 1.2rem; color: rgba(255,255,255,0.9); line-height: 1.5;">
-            <li>Find company information (name / address / ID)</li>
-            <li>Find property information (name / address / ID)</li>
-            <li>Find ticket information (property, description, price, link) by ticket ID</li>
-            <li>Find invoice for a ticket by ticket ID</li>
-            <li>Show 5 most recent service / opportunity tickets (by property)</li>
-            <li>Show all notes for a property</li>
-            <li>Write executive summary report + draft client response (by property)</li>
-            <li>Create service ticket in CenterPoint Connect (property + issue)</li>
-            <li>Chat history per session (can reset)</li>
-            <li>Check weather at a property / company</li>
-          </ul>
+          <div class="card-title">Capabilities</div>
+          <div style="color: rgba(255,255,255,0.88); line-height:1.7;">
+            <ul style="margin:0; padding-left: 1.2rem;">
+              <li>Find company / property info (name / address / ID)</li>
+              <li>Ticket details & invoice lookup (by ticket ID)</li>
+              <li>5 most recent service / opportunity tickets (by property)</li>
+              <li>All notes from a property</li>
+              <li>Executive summary + client draft response</li>
+              <li>Create service ticket in CenterPoint Connect</li>
+              <li>Weather at property/company</li>
+            </ul>
+          </div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
+def set_draft(text: str):
+    st.session_state.draft = text
 
 def render_quick_actions():
     st.markdown('<div class="card"><div class="card-title">Quick actions</div>', unsafe_allow_html=True)
 
-    colA, colB, colC = st.columns(3)
-    with colA:
-        if st.button("🏢 Find a property", use_container_width=True):
-            set_prefill("show property ")
-    with colB:
-        if st.button("🎫 Check tickets", use_container_width=True):
-            set_prefill("show tickets for property ")
-    with colC:
-        if st.button("🛠️ Create service ticket", use_container_width=True):
-            set_prefill("create service ticket for property  issue: ")
-
-    st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
-
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("🧾 Find invoice (ticket id)", use_container_width=True):
-            set_prefill("show invoice for ticket ")
+        if st.button("🏢 Find a property", use_container_width=True):
+            set_draft("show property ")
     with c2:
+        if st.button("🎫 Check tickets", use_container_width=True):
+            set_draft("show tickets for property ")
+    with c3:
+        if st.button("🛠️ Create service ticket", use_container_width=True):
+            set_draft("create service ticket for property  issue: ")
+
+    c4, c5 = st.columns(2)
+    with c4:
+        if st.button("🧾 Find invoice (ticket id)", use_container_width=True):
+            set_draft("show invoice for ticket ")
+    with c5:
         if st.button("📝 Exec summary (property)", use_container_width=True):
-            set_prefill("write executive summary for property ")
+            set_draft("write executive summary for property ")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-
-def render_reply(reply_obj):
+def render_reply(reply_obj: dict):
     """
-    Render nicely: message, title, fields, items(list), table(list-of-dicts), link.
+    Cleaner rendering:
+    - If {message} => markdown
+    - If title/fields/link => nice card style
+    - Otherwise show compact summary + raw expander
     """
     if not isinstance(reply_obj, dict):
         st.markdown(str(reply_obj))
         return
 
-    # simplest response
+    # 1) simplest
     if set(reply_obj.keys()) <= {"message"}:
         st.markdown(reply_obj.get("message", ""))
-        return  # IMPORTANT stop here
+        return
 
     title = reply_obj.get("title") or reply_obj.get("heading") or reply_obj.get("name")
     message = reply_obj.get("message") or reply_obj.get("summary")
+    fields = reply_obj.get("fields") if isinstance(reply_obj.get("fields"), dict) else None
+    link = reply_obj.get("link") or reply_obj.get("url")
 
     if title:
-        st.markdown(f"### {title}")
+        st.markdown(f"**{title}**")
     if message:
         st.markdown(message)
 
-    # fields: key/value
-    fields = reply_obj.get("fields")
-    if isinstance(fields, dict) and fields:
+    if fields:
         st.markdown('<div class="kv">', unsafe_allow_html=True)
         for k, v in fields.items():
             st.markdown(f'<div class="k">{k}</div><div class="v">{v}</div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # items: list of cards
-    items = reply_obj.get("items")
-    if isinstance(items, list) and items:
-        st.write("")
-        for it in items[:25]:
-            if isinstance(it, dict):
-                it_title = it.get("title") or it.get("name") or it.get("id") or "Item"
-                it_desc = it.get("message") or it.get("summary") or it.get("description") or ""
-                it_link = it.get("link") or it.get("url")
-
-                st.markdown(
-                    f"""
-                    <div class="card" style="margin-bottom:12px;">
-                      <div style="font-weight:700; font-size:15px; margin-bottom:6px;">{it_title}</div>
-                      <div style="opacity:0.85; font-size:13px; line-height:1.45;">{it_desc}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-                if it_link:
-                    st.markdown(f"**Link:** {it_link}")
-            else:
-                st.markdown(f"- {it}")
-
-    # table: list-of-dicts
-    table = reply_obj.get("table")
-    if isinstance(table, list) and table and isinstance(table[0], dict):
-        st.write("")
-        st.dataframe(table, use_container_width=True)
-
-    # fallback: compact view
-    if not fields and not items and not table:
+    # Compact fallback (skip huge nested blobs)
+    if not fields:
         compact = {}
         for k, v in reply_obj.items():
             if k in ("raw", "data", "response", "output"):
@@ -320,119 +345,173 @@ def render_reply(reply_obj):
                 st.markdown(f'<div class="k">{k}</div><div class="v">{v}</div>', unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-    link = reply_obj.get("link") or reply_obj.get("url")
     if link:
-        st.markdown(f"**Link:** {link}")
+        st.markdown(f"🔗 **Open:** {link}")
 
+    # Always offer raw view
+    with st.expander("Raw payload"):
+        st.code(safe_json(reply_obj), language="json")
 
 # ---------------------------
-# Sidebar (SaaS style)
+# Sidebar (SaaS Nav)
 # ---------------------------
 with st.sidebar:
-    st.markdown("## Hustad AI")
-    st.markdown('<span class="pill">Internal Tool</span>', unsafe_allow_html=True)
-    st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
-
-    user_id = st.text_input("User ID", value="aminul@hustadcompanies.com")
     st.markdown(
-        f'<div class="small-muted">Session</div><div class="pill">{st.session_state.session_id}</div>',
+        '<div class="sidebar-title"><span class="logo-dot"></span> Hustad Companies</div>',
         unsafe_allow_html=True
     )
+    st.markdown('<div class="small-muted">Internal Enterprise Assistant</div>', unsafe_allow_html=True)
 
-    st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
-    if st.button("🧹 New chat session", use_container_width=True):
-        st.session_state.session_id = str(uuid.uuid4())
-        st.session_state.messages = []
-        st.session_state.last_debug = None
-        st.session_state.prefill = ""
-        st.session_state.chat_input = ""
+    st.markdown('<hr class="divider"/>', unsafe_allow_html=True)
+
+    user_id = st.text_input("User ID", value="aminul@hustadcompanies.com")
+    st.markdown('<div class="small-muted">Status</div>', unsafe_allow_html=True)
+    if N8N_WEBHOOK_URL:
+        st.markdown('<span class="pill">🟢 Connected to n8n</span>', unsafe_allow_html=True)
+    else:
+        st.markdown('<span class="pill">🟠 Missing N8N_WEBHOOK_URL</span>', unsafe_allow_html=True)
+
+    st.markdown('<hr class="divider"/>', unsafe_allow_html=True)
+
+    if st.button("＋ New Session", use_container_width=True):
+        s = _new_session()
+        st.session_state.sessions.insert(0, s)
+        st.session_state.active_session_id = s["id"]
+        st.session_state.draft = ""
         st.rerun()
 
-    st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
-    st.markdown("### Status")
-    if N8N_WEBHOOK_URL:
-        st.success("Connected to n8n webhook")
-    else:
-        st.warning("Missing N8N_WEBHOOK_URL (set in Streamlit Secrets)")
+    st.markdown('<div class="small-muted" style="margin-top:10px;">RECENT CONTEXT</div>', unsafe_allow_html=True)
+    for s in st.session_state.sessions[:8]:
+        label = s["title"] if s["title"] else "New session"
+        if st.button(label, use_container_width=True, key=f"session_{s['id']}"):
+            st.session_state.active_session_id = s["id"]
+            st.session_state.draft = ""
+            st.rerun()
+
+    st.markdown('<hr class="divider"/>', unsafe_allow_html=True)
+    with st.expander("Tools"):
+        render_quick_actions()
+        st.write("")
+        render_capabilities_card()
 
 # ---------------------------
-# Main Layout
+# Main Topbar
 # ---------------------------
 st.markdown(
     f"""
-    <div class="hustad-header">
+    <div class="topbar">
       <div>
-        <div style="font-size: 24px; font-weight: 700;">Hustad AI Assistant</div>
-        <div style="color: rgba(255,255,255,0.65); font-size: 13px;">
-          Ask about properties, companies, tickets, invoices, summaries, and service ticket creation.
-        </div>
+        <h2>Enterprise Assistant</h2>
+        <div class="small-muted">Ask about properties, tickets, invoices, summaries, and service ticket creation.</div>
       </div>
-      <div class="hustad-badge">🕒 {datetime.now().strftime("%b %d, %Y • %I:%M %p")}</div>
+      <div class="status-pill">
+        <span class="dot"></span>
+        {datetime.now().strftime("%b %d, %Y • %I:%M %p")}
+      </div>
     </div>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
-
 st.write("")
 
-left, right = st.columns([0.35, 0.65], gap="large")
+# ---------------------------
+# Main Chat Area (Full width like SaaS)
+# ---------------------------
+st.markdown('<div class="chat-shell">', unsafe_allow_html=True)
 
-with left:
-    render_capabilities()
-    st.write("")
-    render_quick_actions()
+# Welcome block if empty
+if len(active["messages"]) == 0:
+    st.markdown(
+        """
+        <div class="card" style="max-width: 820px; margin: 10px auto;">
+          <div class="card-title">Welcome</div>
+          <div style="color: rgba(255,255,255,0.88); line-height: 1.7;">
+            Hello! I’m the Hustad AI Agent. Use the left menu for quick actions, or ask your question below.
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-with right:
-    st.markdown('<div class="card"><div class="card-title">Chat</div>', unsafe_allow_html=True)
-    st.markdown('<div class="chat-wrap">', unsafe_allow_html=True)
+# Render chat history
+for msg in active["messages"]:
+    role = msg.get("role", "assistant")
+    content = msg.get("content", "")
 
-    # Render history
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            if isinstance(msg.get("content"), dict):
-                render_reply(msg["content"])
-            else:
-                st.markdown(msg.get("content", ""))
+    with st.chat_message(role):
+        klass = "user" if role == "user" else "assistant"
+        st.markdown(f'<div class="bubble {klass}">', unsafe_allow_html=True)
+        if isinstance(content, dict):
+            render_reply(content)
+        else:
+            st.markdown(content)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Input (prefill is injected via session_state.chat_input)
-    prompt = st.chat_input("Type your message…", key="chat_input")
-
-    # Debug expander
-    with st.expander("Debug / Raw response"):
-        st.write("Last request/response:")
-        st.code(safe_json(st.session_state.last_debug), language="json")
-
-    st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------
-# Handle Send
+# Composer (prefillable, SaaS feel)
 # ---------------------------
-if prompt:
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+st.write("")
+st.markdown('<div class="composer">', unsafe_allow_html=True)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Working…"):
-            try:
-                resp = post_to_n8n(prompt, st.session_state.session_id, user_id)
-                reply_obj = normalize_reply(resp)
+with st.form("composer_form", clear_on_submit=False):
+    colL, colR = st.columns([0.85, 0.15], vertical_alignment="bottom")
 
-                if isinstance(reply_obj, dict) and ("output" in reply_obj or "raw" in reply_obj) and len(str(reply_obj)) > 2000:
-                    st.markdown("✅ Got the result. It’s a large payload — see **Debug / Raw response** for full details.")
-                else:
-                    render_reply(reply_obj)
+    with colL:
+        draft = st.text_area(
+            "Message",
+            value=st.session_state.draft,
+            key="draft_input",
+            height=90,
+            label_visibility="collapsed",
+            placeholder="Ask about tickets, properties, invoices…"
+        )
 
-                st.session_state.messages.append({"role": "assistant", "content": reply_obj})
+    with colR:
+        send = st.form_submit_button("Send", use_container_width=True)
+        clear = st.form_submit_button("Clear", use_container_width=True)
 
-                # Clear prefill after sending
-                st.session_state.prefill = ""
-                st.session_state.chat_input = ""
+    if clear:
+        st.session_state.draft = ""
+        st.rerun()
 
-            except Exception as e:
-                st.error(f"Request failed: {e}")
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": {"message": f"Request failed: {e}"}}
-                )
+    if send:
+        prompt = (draft or "").strip()
+        if not prompt:
+            st.warning("Type a message first.")
+        else:
+            # set a nice session title on first message
+            if active["title"] == "New session":
+                active["title"] = infer_session_title_from_prompt(prompt)
+
+            active["messages"].append({"role": "user", "content": prompt})
+
+            with st.spinner("Working…"):
+                try:
+                    resp = post_to_n8n(prompt, active["id"], user_id)
+                    reply_obj = normalize_reply(resp)
+
+                    # If huge raw dump, show friendly and keep raw in expander
+                    if isinstance(reply_obj, dict) and len(safe_json(reply_obj)) > 12000:
+                        reply_obj = {
+                            "message": "✅ Got the result (large payload). Open **Raw payload** to view details.",
+                            "fields": {"Tip": "We can format this into a clean card/table if you tell me which fields you want."}
+                        }
+
+                    active["messages"].append({"role": "assistant", "content": reply_obj})
+
+                    st.session_state.draft = ""
+                    st.rerun()
+
+                except Exception as e:
+                    active["messages"].append({"role": "assistant", "content": {"message": f"Request failed: {e}"}})
+                    st.error(f"Request failed: {e}")
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ---------------------------
+# Debug (Global)
+# ---------------------------
+with st.expander("Debug (last request)"):
+    st.code(safe_json(active.get("last_debug")), language="json")
