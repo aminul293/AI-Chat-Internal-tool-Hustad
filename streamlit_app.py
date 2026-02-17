@@ -59,18 +59,13 @@ hr.soft {
   margin: 12px 0;
 }
 
-/* Chat box */
+/* Chat bubbles */
 .chat-wrap {
   border-radius: 16px;
   background: rgba(18,20,26,0.75);
   border: 1px solid rgba(255,255,255,0.08);
   padding: 12px;
-
-  /* ChatGPT-like behavior */
-  height: 70vh;
-  overflow-y: auto;
 }
-
 .small-muted { color: rgba(255,255,255,0.6); font-size: 12px; }
 .kv {
   display: grid;
@@ -96,7 +91,8 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 # ---------------------------
 # Config / Secrets
 # ---------------------------
-# Streamlit Cloud → Settings → Secrets:
+# In Streamlit Cloud:
+# Settings → Secrets:
 # N8N_WEBHOOK_URL = "https://.../webhook/...."  (PRODUCTION url)
 N8N_WEBHOOK_URL = st.secrets.get("N8N_WEBHOOK_URL", "").strip()
 
@@ -131,14 +127,14 @@ def post_to_n8n(message: str, session_id: str, user_id: str):
         "userId": user_id,
     }
     r = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=120)
-
     # Keep debug
-    st.session_state.last_debug = {
+    debug = {
         "status_code": r.status_code,
         "request_url": N8N_WEBHOOK_URL,
         "payload": payload,
         "raw_text": r.text[:5000],
     }
+    st.session_state.last_debug = debug
 
     r.raise_for_status()
     try:
@@ -148,12 +144,11 @@ def post_to_n8n(message: str, session_id: str, user_id: str):
 
 def normalize_reply(data: dict):
     """
-    Expected n8n response:
+    Expecting your n8n response:
       { reply: <obj/string>, sessionId: "...", userId: "..." }
     But handle variations safely.
     """
     reply = data.get("reply", data)
-
     # If n8n returns { "output": "..."} style
     if isinstance(reply, dict) and "output" in reply and len(reply.keys()) == 1:
         reply = reply["output"]
@@ -218,17 +213,15 @@ def render_quick_actions():
 def render_reply(reply_obj: dict):
     """
     Make output look clean instead of dumping JSON.
-    Detect common shapes and present nicely.
+    Try to detect common shapes and present nicely.
     """
-    if not isinstance(reply_obj, dict):
-        st.markdown(str(reply_obj))
-        return
-
-    # Common simplest: {message: "..."}
+    # Common: {message: "..."} only
     if set(reply_obj.keys()) <= {"message"}:
         st.markdown(reply_obj.get("message", ""))
-        return
 
+    # Property / Company / Ticket style fields
+    # If your n8n returns a structured block like:
+    # { title, fields:{...}, link, ... } we support that too.
     title = reply_obj.get("title") or reply_obj.get("heading") or reply_obj.get("name")
     message = reply_obj.get("message") or reply_obj.get("summary")
 
@@ -244,12 +237,16 @@ def render_reply(reply_obj: dict):
         for k, v in fields.items():
             st.markdown(f'<div class="k">{k}</div><div class="v">{v}</div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
-    else:
-        # Friendly compact view
+
+    # Fallback: show key/values (excluding giant blobs)
+    # If reply is a raw object from CPC, show a small summary and keep raw in debug expander.
+    if not fields and len(reply_obj.keys()) > 1:
+        # Try to show a friendly compact view
         compact = {}
         for k, v in reply_obj.items():
             if k in ("raw", "data", "response", "output"):
                 continue
+            # Avoid huge nested objects here
             if isinstance(v, (dict, list)) and len(str(v)) > 300:
                 continue
             compact[k] = v
@@ -260,6 +257,7 @@ def render_reply(reply_obj: dict):
                 st.markdown(f'<div class="k">{k}</div><div class="v">{v}</div>', unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
+    # Optional: link
     link = reply_obj.get("link") or reply_obj.get("url")
     if link:
         st.markdown(f"**Link:** {link}")
@@ -268,15 +266,12 @@ def render_reply(reply_obj: dict):
 # Sidebar (SaaS style)
 # ---------------------------
 with st.sidebar:
-    st.markdown("## Hustad AI OS")
+    st.markdown("## Hustad AI")
     st.markdown('<span class="pill">Internal Tool</span>', unsafe_allow_html=True)
     st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
 
     user_id = st.text_input("User ID", value="aminul@hustadcompanies.com")
-    st.markdown(
-        f'<div class="small-muted">Session</div><div class="pill">{st.session_state.session_id}</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown(f'<div class="small-muted">Session</div><div class="pill">{st.session_state.session_id}</div>', unsafe_allow_html=True)
 
     st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
     if st.button("🧹 New chat session", use_container_width=True):
@@ -300,9 +295,9 @@ st.markdown(
     f"""
     <div class="hustad-header">
       <div>
-        <div style="font-size: 24px; font-weight: 700;">Enterprise Assistant</div>
+        <div style="font-size: 24px; font-weight: 700;">Hustad AI Assistant</div>
         <div style="color: rgba(255,255,255,0.65); font-size: 13px;">
-          AI Operating System for CenterPoint Connect • Tickets • Properties • Reports
+          Ask about properties, companies, tickets, invoices, summaries, and service ticket creation.
         </div>
       </div>
       <div class="hustad-badge">🕒 {datetime.now().strftime("%b %d, %Y • %I:%M %p")}</div>
@@ -312,74 +307,64 @@ st.markdown(
 )
 
 st.write("")
-left, right = st.columns([0.30, 0.70], gap="large")
+
+left, right = st.columns([0.35, 0.65], gap="large")
 
 with left:
-    render_quick_actions()
-    st.write("")
     render_capabilities()
+    st.write("")
+    render_quick_actions()
 
 with right:
-    # Chat card wrapper
     st.markdown('<div class="card"><div class="card-title">Chat</div>', unsafe_allow_html=True)
-
-    # Scrollable chat region
     st.markdown('<div class="chat-wrap">', unsafe_allow_html=True)
-    chat_area = st.container()
+
+    # Render history
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            if isinstance(msg.get("content"), dict):
+                render_reply(msg["content"])
+            else:
+                st.markdown(msg.get("content", ""))
+
+    # Input with prefill
+    prompt = st.chat_input("Type your message…", key="chat_input")
+    if not prompt and st.session_state.prefill:
+        # Show prefill hint as a helper line (not auto-sending)
+        st.markdown(f'<div class="small-muted">Tip: click in the input and paste → <span class="pill">{st.session_state.prefill}</span></div>', unsafe_allow_html=True)
+
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Debug expander (kept inside card)
+    # Debug expander
     with st.expander("Debug / Raw response"):
         st.write("Last request/response:")
         st.code(safe_json(st.session_state.last_debug), language="json")
 
-    st.markdown("</div>", unsafe_allow_html=True)  # close card
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    # Render history INSIDE the chat box
-    with chat_area:
-        for msg in st.session_state.messages:
-            with st.chat_message(msg["role"]):
-                if isinstance(msg.get("content"), dict):
-                    render_reply(msg["content"])
+# ---------------------------
+# Handle Send
+# ---------------------------
+if prompt:
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Working…"):
+            try:
+                resp = post_to_n8n(prompt, st.session_state.session_id, user_id)
+                reply_obj = normalize_reply(resp)
+
+                # If response is still huge raw, keep it in debug and show a friendly message
+                # Otherwise render nicely
+                if isinstance(reply_obj, dict) and ("output" in reply_obj or "raw" in reply_obj) and len(str(reply_obj)) > 2000:
+                    st.markdown("✅ Got the result. It’s a large payload — see **Debug / Raw response** for full details.")
                 else:
-                    st.markdown(msg.get("content", ""))
+                    render_reply(reply_obj)
 
-    # ChatGPT-style input (Streamlit's fixed input)
-    prompt = st.chat_input("Message Hustad AI…", key="chat_input")
+                st.session_state.messages.append({"role": "assistant", "content": reply_obj})
 
-    # Prefill helper line (optional)
-    if (not prompt) and st.session_state.prefill:
-        st.markdown(
-            f'<div class="small-muted">Suggested command: <span class="pill">{st.session_state.prefill}</span> (copy & paste)</div>',
-            unsafe_allow_html=True
-        )
-
-    # IMPORTANT: Handle send here so reply renders INSIDE chat box, not below it
-    if prompt:
-        # Save + render user message immediately inside the chat box
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with chat_area:
-            with st.chat_message("user"):
-                st.markdown(prompt)
-
-        # Call n8n + render assistant reply immediately inside the chat box
-        with chat_area:
-            with st.chat_message("assistant"):
-                with st.spinner("Working…"):
-                    try:
-                        resp = post_to_n8n(prompt, st.session_state.session_id, user_id)
-                        reply_obj = normalize_reply(resp)
-
-                        # If huge payload, keep details in debug
-                        if isinstance(reply_obj, dict) and len(str(reply_obj)) > 2000:
-                            st.markdown("✅ Got the result. It’s a large payload — open **Debug / Raw response** to view full details.")
-                        else:
-                            render_reply(reply_obj)
-
-                        st.session_state.messages.append({"role": "assistant", "content": reply_obj})
-
-                    except Exception as e:
-                        st.error(f"Request failed: {e}")
-                        st.session_state.messages.append(
-                            {"role": "assistant", "content": {"message": f"Request failed: {e}"}}
-                        )
+            except Exception as e:
+                st.error(f"Request failed: {e}")
+                st.session_state.messages.append({"role": "assistant", "content": {"message": f"Request failed: {e}"}})
