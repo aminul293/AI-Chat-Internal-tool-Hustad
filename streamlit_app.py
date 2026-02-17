@@ -33,8 +33,6 @@ st.markdown(
       --amber:#ff7a00;
       --violet:#7f00ff;
 
-      --glass: rgba(255,255,255,.06);
-      --glass2: rgba(255,255,255,.10);
       --stroke: rgba(255,255,255,.18);
       --stroke2: rgba(255,255,255,.28);
     }
@@ -335,7 +333,7 @@ st.markdown(
 )
 
 # ----------------------------
-# Neon particle canvas overlay (REAL particles)
+# Neon particle canvas overlay (FIXED: no f-string braces issues)
 # ----------------------------
 def neon_particles_overlay(
     particle_count: int = 110,
@@ -343,21 +341,21 @@ def neon_particles_overlay(
     link_distance: int = 150,
     opacity: float = 0.70,
 ):
-    html = f"""
+    html = """
     <style>
-      #neon-particles-wrap {{
+      #neon-particles-wrap {
         position: fixed;
         inset: 0;
-        z-index: 1;              /* behind Streamlit content (z=2), above background (z=0) */
+        z-index: 1;
         pointer-events: none;
-      }}
-      canvas#neon-particles {{
+      }
+      canvas#neon-particles {
         width: 100%;
         height: 100%;
         display: block;
         filter: drop-shadow(0 0 10px rgba(0,255,255,.15)) drop-shadow(0 0 16px rgba(255,0,255,.10));
-        opacity: {opacity};
-      }}
+        opacity: __OPACITY__;
+      }
     </style>
 
     <div id="neon-particles-wrap">
@@ -365,7 +363,7 @@ def neon_particles_overlay(
     </div>
 
     <script>
-      (function() {{
+      (function () {
         const canvas = document.getElementById("neon-particles");
         const ctx = canvas.getContext("2d");
 
@@ -377,50 +375,48 @@ def neon_particles_overlay(
           [127, 0, 255]
         ];
 
-        function resize() {{
+        function resize() {
           const dpr = window.devicePixelRatio || 1;
           canvas.width = Math.floor(window.innerWidth * dpr);
           canvas.height = Math.floor(window.innerHeight * dpr);
           canvas.style.width = window.innerWidth + "px";
           canvas.style.height = window.innerHeight + "px";
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        }}
+        }
         window.addEventListener("resize", resize);
         resize();
 
         const W = () => window.innerWidth;
         const H = () => window.innerHeight;
 
-        const N = {particle_count};
-        const MAX_SPEED = {max_speed};
-        const LINK_DIST = {link_distance};
+        const N = __PARTICLE_COUNT__;
+        const MAX_SPEED = __MAX_SPEED__;
+        const LINK_DIST = __LINK_DISTANCE__;
 
         const particles = [];
-        for (let i = 0; i < N; i++) {{
+        for (let i = 0; i < N; i++) {
           const c = COLORS[Math.floor(Math.random() * COLORS.length)];
-          particles.push({{
+          particles.push({
             x: Math.random() * W(),
             y: Math.random() * H(),
             vx: (Math.random() * 2 - 1) * MAX_SPEED,
             vy: (Math.random() * 2 - 1) * MAX_SPEED,
             r: 1.2 + Math.random() * 1.9,
             c
-          }});
-        }}
+          });
+        }
 
         let mx = W() / 2, my = H() / 2;
-        window.addEventListener("mousemove", (e) => {{
-          mx = e.clientX; my = e.clientY;
-        }});
+        window.addEventListener("mousemove", (e) => { mx = e.clientX; my = e.clientY; });
 
-        function rgba(rgb, a) {{
-          return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
-        }}
+        function rgba(rgb, a) {
+          return "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + a + ")";
+        }
 
-        function step() {{
+        function step() {
           ctx.clearRect(0, 0, W(), H());
 
-          for (const p of particles) {{
+          for (const p of particles) {
             const dxm = mx - p.x;
             const dym = my - p.y;
             const distm = Math.sqrt(dxm*dxm + dym*dym) + 0.001;
@@ -430,18 +426,18 @@ def neon_particles_overlay(
 
             const sp = Math.sqrt(p.vx*p.vx + p.vy*p.vy) + 0.001;
             const cap = MAX_SPEED * 1.6;
-            if (sp > cap) {{
+            if (sp > cap) {
               p.vx = (p.vx / sp) * cap;
               p.vy = (p.vy / sp) * cap;
-            }}
+            }
 
             p.x += p.vx;
             p.y += p.vy;
 
-            if (p.x < 0) {{ p.x = 0; p.vx *= -1; }}
-            if (p.x > W()) {{ p.x = W(); p.vx *= -1; }}
-            if (p.y < 0) {{ p.y = 0; p.vy *= -1; }}
-            if (p.y > H()) {{ p.y = H(); p.vy *= -1; }}
+            if (p.x < 0) { p.x = 0; p.vx *= -1; }
+            if (p.x > W()) { p.x = W(); p.vx *= -1; }
+            if (p.y < 0) { p.y = 0; p.vy *= -1; }
+            if (p.y > H()) { p.y = H(); p.vy *= -1; }
 
             ctx.beginPath();
             ctx.fillStyle = rgba(p.c, 0.82);
@@ -452,16 +448,16 @@ def neon_particles_overlay(
             ctx.fillStyle = "rgba(255,255,255,0.65)";
             ctx.arc(p.x, p.y, Math.max(0.6, p.r * 0.35), 0, Math.PI * 2);
             ctx.fill();
-          }}
+          }
 
-          for (let i = 0; i < particles.length; i++) {{
-            for (let j = i + 1; j < particles.length; j++) {{
+          for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
               const a = particles[i];
               const b = particles[j];
               const dx = a.x - b.x;
               const dy = a.y - b.y;
               const d = Math.sqrt(dx*dx + dy*dy);
-              if (d < LINK_DIST) {{
+              if (d < LINK_DIST) {
                 const t = 1 - (d / LINK_DIST);
                 const c = [
                   (a.c[0] + b.c[0]) / 2,
@@ -474,20 +470,28 @@ def neon_particles_overlay(
                 ctx.moveTo(a.x, a.y);
                 ctx.lineTo(b.x, b.y);
                 ctx.stroke();
-              }}
-            }}
-          }}
+              }
+            }
+          }
 
           requestAnimationFrame(step);
-        }}
+        }
 
         step();
-      }})();
+      })();
     </script>
     """
+
+    html = (
+        html.replace("__PARTICLE_COUNT__", str(int(particle_count)))
+            .replace("__MAX_SPEED__", str(float(max_speed)))
+            .replace("__LINK_DISTANCE__", str(int(link_distance)))
+            .replace("__OPACITY__", str(float(opacity)))
+    )
+
     components.html(html, height=0, width=0)
 
-# Call it once (top-level)
+# Call once (top-level)
 neon_particles_overlay()
 
 # ----------------------------
@@ -528,7 +532,7 @@ def call_n8n(message: str) -> dict:
 
     raw = resp
 
-    # n8n often returns a list: [{...}]
+    # n8n often returns list: [{...}]
     if isinstance(resp, list):
         resp = resp[0] if resp else {}
 
@@ -553,13 +557,12 @@ def call_n8n(message: str) -> dict:
             data_out = resp.get("data") or {}
 
         else:
-            # IMPORTANT: don't dump full json as message (that creates the "second output" feel)
             message_out = "Done."
             data_out = resp
     else:
         message_out = str(resp)
 
-    # If backend duplicates text in data.output, drop it to avoid double-render patterns
+    # Drop duplicated text field that causes double-render patterns
     if isinstance(data_out, dict) and isinstance(data_out.get("output"), str):
         data_out.pop("output", None)
 
@@ -604,7 +607,7 @@ def render_property_card(data: dict):
             addr_parts.append(tail)
         address = " • ".join(addr_parts)
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card" style="padding:1rem;">', unsafe_allow_html=True)
     st.markdown(
         f"""
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem;">
@@ -693,7 +696,6 @@ if st.session_state.page == "Chat":
     left, right = st.columns([2.2, 1], gap="large")
 
     with left:
-        # Chat history
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
                 st.write(msg["content"])
@@ -720,7 +722,6 @@ if st.session_state.page == "Chat":
                         st.code(str(e))
                         resp = {"message": "Unexpected error calling backend.", "data": {}, "raw": {"error": str(e)}}
 
-                # Render nicely if property-like
                 if looks_like_property(resp.get("data", {})):
                     st.write(resp.get("message", "Here’s what I found:"))
                     render_property_card(resp.get("data", {}))
@@ -755,9 +756,7 @@ if st.session_state.page == "Chat":
             st.session_state.messages.append({"role": "user", "content": "show tickets"})
             st.rerun()
         if st.button("📝 Create service ticket"):
-            st.session_state.messages.append(
-                {"role": "user", "content": "create service ticket for Riverport Landings Senior"}
-            )
+            st.session_state.messages.append({"role": "user", "content": "create service ticket for Riverport Landings Senior"})
             st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
