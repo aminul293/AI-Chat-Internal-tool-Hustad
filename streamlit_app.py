@@ -84,6 +84,10 @@ hr.soft {
   font-size: 12px;
   color: rgba(255,255,255,0.82);
 }
+
+/* Buttons - subtle lift */
+button[kind="secondary"] { border-radius: 14px !important; }
+button[kind="primary"] { border-radius: 14px !important; }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -107,6 +111,9 @@ if "last_debug" not in st.session_state:
     st.session_state.last_debug = None
 if "prefill" not in st.session_state:
     st.session_state.prefill = ""
+if "chat_input" not in st.session_state:
+    st.session_state.chat_input = ""
+
 
 # ---------------------------
 # Helpers
@@ -117,30 +124,51 @@ def safe_json(obj):
     except Exception:
         return str(obj)
 
+
+def set_prefill(text: str):
+    """Set prefill and actually inject into the chat input."""
+    st.session_state.prefill = text
+    st.session_state.chat_input = text
+
+
 def post_to_n8n(message: str, session_id: str, user_id: str):
     if not N8N_WEBHOOK_URL:
         raise RuntimeError("Missing N8N_WEBHOOK_URL in Streamlit secrets.")
 
-    payload = {
-        "message": message,
-        "sessionId": session_id,
-        "userId": user_id,
-    }
-    r = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=120)
-    # Keep debug
-    debug = {
+    payload = {"message": message, "sessionId": session_id, "userId": user_id}
+
+    try:
+        r = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=60)
+    except requests.exceptions.RequestException as e:
+        st.session_state.last_debug = {
+            "status_code": None,
+            "request_url": N8N_WEBHOOK_URL,
+            "payload": payload,
+            "raw_text": str(e),
+        }
+        raise RuntimeError(f"n8n request error: {e}")
+
+    st.session_state.last_debug = {
         "status_code": r.status_code,
         "request_url": N8N_WEBHOOK_URL,
         "payload": payload,
         "raw_text": r.text[:5000],
     }
-    st.session_state.last_debug = debug
+
+    if r.status_code >= 500:
+        raise RuntimeError(f"n8n server error: {r.status_code}")
+    if r.status_code == 404:
+        raise RuntimeError("n8n webhook not found (404). Check PROD webhook URL.")
+    if r.status_code in (401, 403):
+        raise RuntimeError("n8n unauthorized. Check auth/protection settings.")
 
     r.raise_for_status()
+
     try:
         return r.json()
     except Exception:
-        return {"raw": r.text}
+        return {"reply": r.text}
+
 
 def normalize_reply(data: dict):
     """
@@ -148,7 +176,11 @@ def normalize_reply(data: dict):
       { reply: <obj/string>, sessionId: "...", userId: "..." }
     But handle variations safely.
     """
+    if not isinstance(data, dict):
+        return {"message": str(data)}
+
     reply = data.get("reply", data)
+
     # If n8n returns { "output": "..."} style
     if isinstance(reply, dict) and "output" in reply and len(reply.keys()) == 1:
         reply = reply["output"]
@@ -161,6 +193,7 @@ def normalize_reply(data: dict):
             return {"message": reply}
 
     return reply if isinstance(reply, dict) else {"message": str(reply)}
+
 
 def render_capabilities():
     st.markdown(
@@ -184,44 +217,47 @@ def render_capabilities():
         unsafe_allow_html=True
     )
 
+
 def render_quick_actions():
     st.markdown('<div class="card"><div class="card-title">Quick actions</div>', unsafe_allow_html=True)
 
     colA, colB, colC = st.columns(3)
     with colA:
         if st.button("🏢 Find a property", use_container_width=True):
-            st.session_state.prefill = "show property "
+            set_prefill("show property ")
     with colB:
         if st.button("🎫 Check tickets", use_container_width=True):
-            st.session_state.prefill = "show tickets for property "
+            set_prefill("show tickets for property ")
     with colC:
         if st.button("🛠️ Create service ticket", use_container_width=True):
-            st.session_state.prefill = "create service ticket for property  issue: "
+            set_prefill("create service ticket for property  issue: ")
 
     st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     with c1:
         if st.button("🧾 Find invoice (ticket id)", use_container_width=True):
-            st.session_state.prefill = "show invoice for ticket "
+            set_prefill("show invoice for ticket ")
     with c2:
         if st.button("📝 Exec summary (property)", use_container_width=True):
-            st.session_state.prefill = "write executive summary for property "
+            set_prefill("write executive summary for property ")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-def render_reply(reply_obj: dict):
+
+def render_reply(reply_obj):
     """
-    Make output look clean instead of dumping JSON.
-    Try to detect common shapes and present nicely.
+    Render nicely: message, title, fields, items(list), table(list-of-dicts), link.
     """
-    # Common: {message: "..."} only
+    if not isinstance(reply_obj, dict):
+        st.markdown(str(reply_obj))
+        return
+
+    # simplest response
     if set(reply_obj.keys()) <= {"message"}:
         st.markdown(reply_obj.get("message", ""))
+        return  # IMPORTANT stop here
 
-    # Property / Company / Ticket style fields
-    # If your n8n returns a structured block like:
-    # { title, fields:{...}, link, ... } we support that too.
     title = reply_obj.get("title") or reply_obj.get("heading") or reply_obj.get("name")
     message = reply_obj.get("message") or reply_obj.get("summary")
 
@@ -230,7 +266,7 @@ def render_reply(reply_obj: dict):
     if message:
         st.markdown(message)
 
-    # Render "fields" as key/value
+    # fields: key/value
     fields = reply_obj.get("fields")
     if isinstance(fields, dict) and fields:
         st.markdown('<div class="kv">', unsafe_allow_html=True)
@@ -238,15 +274,42 @@ def render_reply(reply_obj: dict):
             st.markdown(f'<div class="k">{k}</div><div class="v">{v}</div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Fallback: show key/values (excluding giant blobs)
-    # If reply is a raw object from CPC, show a small summary and keep raw in debug expander.
-    if not fields and len(reply_obj.keys()) > 1:
-        # Try to show a friendly compact view
+    # items: list of cards
+    items = reply_obj.get("items")
+    if isinstance(items, list) and items:
+        st.write("")
+        for it in items[:25]:
+            if isinstance(it, dict):
+                it_title = it.get("title") or it.get("name") or it.get("id") or "Item"
+                it_desc = it.get("message") or it.get("summary") or it.get("description") or ""
+                it_link = it.get("link") or it.get("url")
+
+                st.markdown(
+                    f"""
+                    <div class="card" style="margin-bottom:12px;">
+                      <div style="font-weight:700; font-size:15px; margin-bottom:6px;">{it_title}</div>
+                      <div style="opacity:0.85; font-size:13px; line-height:1.45;">{it_desc}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                if it_link:
+                    st.markdown(f"**Link:** {it_link}")
+            else:
+                st.markdown(f"- {it}")
+
+    # table: list-of-dicts
+    table = reply_obj.get("table")
+    if isinstance(table, list) and table and isinstance(table[0], dict):
+        st.write("")
+        st.dataframe(table, use_container_width=True)
+
+    # fallback: compact view
+    if not fields and not items and not table:
         compact = {}
         for k, v in reply_obj.items():
             if k in ("raw", "data", "response", "output"):
                 continue
-            # Avoid huge nested objects here
             if isinstance(v, (dict, list)) and len(str(v)) > 300:
                 continue
             compact[k] = v
@@ -257,10 +320,10 @@ def render_reply(reply_obj: dict):
                 st.markdown(f'<div class="k">{k}</div><div class="v">{v}</div>', unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-    # Optional: link
     link = reply_obj.get("link") or reply_obj.get("url")
     if link:
         st.markdown(f"**Link:** {link}")
+
 
 # ---------------------------
 # Sidebar (SaaS style)
@@ -271,7 +334,10 @@ with st.sidebar:
     st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
 
     user_id = st.text_input("User ID", value="aminul@hustadcompanies.com")
-    st.markdown(f'<div class="small-muted">Session</div><div class="pill">{st.session_state.session_id}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="small-muted">Session</div><div class="pill">{st.session_state.session_id}</div>',
+        unsafe_allow_html=True
+    )
 
     st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
     if st.button("🧹 New chat session", use_container_width=True):
@@ -279,6 +345,7 @@ with st.sidebar:
         st.session_state.messages = []
         st.session_state.last_debug = None
         st.session_state.prefill = ""
+        st.session_state.chat_input = ""
         st.rerun()
 
     st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
@@ -327,13 +394,10 @@ with right:
             else:
                 st.markdown(msg.get("content", ""))
 
-    # Input with prefill
-    prompt = st.chat_input("Type your message…", key="chat_input")
-    if not prompt and st.session_state.prefill:
-        # Show prefill hint as a helper line (not auto-sending)
-        st.markdown(f'<div class="small-muted">Tip: click in the input and paste → <span class="pill">{st.session_state.prefill}</span></div>', unsafe_allow_html=True)
-
     st.markdown("</div>", unsafe_allow_html=True)
+
+    # Input (prefill is injected via session_state.chat_input)
+    prompt = st.chat_input("Type your message…", key="chat_input")
 
     # Debug expander
     with st.expander("Debug / Raw response"):
@@ -356,8 +420,6 @@ if prompt:
                 resp = post_to_n8n(prompt, st.session_state.session_id, user_id)
                 reply_obj = normalize_reply(resp)
 
-                # If response is still huge raw, keep it in debug and show a friendly message
-                # Otherwise render nicely
                 if isinstance(reply_obj, dict) and ("output" in reply_obj or "raw" in reply_obj) and len(str(reply_obj)) > 2000:
                     st.markdown("✅ Got the result. It’s a large payload — see **Debug / Raw response** for full details.")
                 else:
@@ -365,6 +427,12 @@ if prompt:
 
                 st.session_state.messages.append({"role": "assistant", "content": reply_obj})
 
+                # Clear prefill after sending
+                st.session_state.prefill = ""
+                st.session_state.chat_input = ""
+
             except Exception as e:
                 st.error(f"Request failed: {e}")
-                st.session_state.messages.append({"role": "assistant", "content": {"message": f"Request failed: {e}"}})
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": {"message": f"Request failed: {e}"}}
+                )
